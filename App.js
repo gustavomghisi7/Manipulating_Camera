@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StatusBar, StyleSheet, TouchableOpacity, Modal, Image } from 'react-native';
+import { View, Text, StatusBar, StyleSheet, TouchableOpacity, Modal, Image, PermissionsAndroid, Platform } from 'react-native';
 import { RNCamera } from 'react-native-camera';
 import CameraRoll from '@react-native-community/cameraroll';
+import ImagePicker from 'react-native-image-picker';
 
 export default function App() {
   const [type, setType] = useState(RNCamera.Constants.Type.back);
@@ -15,11 +16,62 @@ export default function App() {
     setCapturedPhoto(data.uri);
     setOpen(true);
     console.log('Foto tirada câmera: ' + data.uri);
+
+    //Chama função salvar foto
+    savePicture(data.uri);
+  }
+
+  async function hasAndroidPermission(){
+    const permission = PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE;
+    const hasPermission = await PermissionsAndroid.check(permission);
+
+    if(hasPermission){
+      return true;  
+    }
+
+    const status = await PermissionsAndroid.request(permission);
+    return status === 'granted';
+  }
+
+  async function savePicture(data){
+    if(Platform.OS === 'android' && !(await hasAndroidPermission())){
+      return;
+    }
+    
+    CameraRoll.save(data, 'photo')
+    .then((res) => {
+      console.log('Salvo com sucesso: ' + res)
+    })
+    .catch((err) => {
+      console.log('Erro ao salvar: ' + err)
+    })
   }
 
   function toggleCam(){
     setType(type === RNCamera.Constants.Type.back
     ? RNCamera.Constants.Type.front : RNCamera.Constants.Type.back)
+  }
+
+  function openAlbum(){
+    const options = {
+      title: 'Selecione uma foto',
+      chooseFromLibraryButtonTitle: 'Buscar foto do album..',
+      noData: true,
+      mediaType: 'photo',
+    };
+
+    ImagePicker.launchImageLibrary(options, (response) => {
+
+      if(response.didCancel){
+        console.log('Image Picker cancelado...');
+      } else if(response.error){
+        console.log('Gerou algum erro: ' + response.error);
+      } else {
+        setCapturedPhoto(response.uri);
+        setOpen(true);
+      }
+
+    })
   }
 
   return (
@@ -50,7 +102,7 @@ export default function App() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  onPress={() => {}}
+                  onPress={openAlbum}
                   style={styles.capture}
                 >
                   <Text style={{fontSize: 18}}>Album</Text>
@@ -75,13 +127,13 @@ export default function App() {
             >
               <Text style={{ fontSize: 24 }}>Fechar</Text>
 
-              <Image
-                  resizeMode="contain"
-                  style={{width: 350, height: 450, borderRadius: 15}}
-                  source={{ uri:capturedPhoto }}
-                />
-
             </TouchableOpacity>
+
+            <Image
+              resizeMode="contain"
+              style={{width: 350, height: 450, borderRadius: 15}}
+              source={{ uri:capturedPhoto }}
+            />
           </View>
         </Modal>
 
